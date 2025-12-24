@@ -1,73 +1,73 @@
-import { CourseModel } from "../models/course.model";
-import { courseCategories, type Course, type NewCourse, type CourseWithCategoryIds } from "../config/schema";
-import { db } from "../config/db";
-import { eq } from "drizzle-orm";
+import { AppDataSource } from "../config/data-source";
+import { Course } from "../entities/course.entity";
+import { Category } from "../entities/category.entity";
+import { CourseDto } from "../dtos/course.dto";
+import cloudinary from "../config/cloudinary";
+
 
 export class CourseService {
-  static async getAll(): Promise<CourseWithCategoryIds[]> {
-    return CourseModel.getAll(); // ✅ Đã có categoryIds
+  private repo = AppDataSource.getRepository(Course);
+  private categoryRepo = AppDataSource.getRepository(Category);
+
+  async findAll() {
+    return this.repo.find({ relations: ["categories"], order: { id: "DESC" } });
   }
-  static async getById(id: number): Promise<Course> {
-    const course = await CourseModel.getById(id);
-    if (!course) throw { status: 404, message: "Course not found" };
+
+  async findOne(id: number) {
+    const course = await this.repo.findOne({
+      where: { id },
+      relations: ["categories"],
+    });
+    if (!course) throw new Error("Course not found");
     return course;
   }
 
-static async create(data: CourseWithCategoryIds): Promise<CourseWithCategoryIds> {
-  const { categoryIds, ...courseData } = data;
-
-  // Step 1: Insert course
-  const course = await CourseModel.create(courseData);
-
-  // Step 2: Insert course_categories (không trong transaction)
-  const categoryLinks = categoryIds.map((categoryId) => ({
-    courseId: course.id,
-    categoryId,
-  }));
+  async create(payload: CourseDto, file?: Express.Multer.File) {
+  let categories: Category[] = [];
   
-  await db.insert(courseCategories).values(categoryLinks);
-
-  // Step 3: Return merged
-  return {
-    ...course,
-    categoryIds,
-  };
-}
-static async update(id: number,
-  data: Partial<CourseWithCategoryIds>
-): Promise<CourseWithCategoryIds> {
-  const { categoryIds, ...courseData } = data;
-
-  if (!id) {
-    throw new Error("Course ID is required for update");
+  if (payload.categoryIds?.length) {
+    categories = await this.categoryRepo.findByIds(payload.categoryIds);
   }
 
-    // Step 1: Insert course
-  const course = await CourseModel.update(courseData);
-  if (!course) {
-    throw new Error(`Course with id ${courseData.id} not found.`);
+let imgUrl: string | undefined = undefined;
+
+  // Nếu có file thì upload lên Cloudinary
+  if (file) {
+    const result = await cloudinary.uploader.upload(file.path, {
+      folder: "courses",
+    });
+    imgUrl = result.secure_url;   // URL thực tế từ Cloudinary
   }
 
-  // Step 2: Update categories (không trong transaction)
-  if (categoryIds) {
-    await db.delete(courseCategories).where(eq(courseCategories.courseId,id));
+  const course = this.repo.create({
+    name: payload.name,
+    description: payload.description,
+    imgUrl,     // dùng URL Cloudinary, không phải payload.imgUrl
+    status: true,
+    categories,
+  });
 
-    const categoryLinks = categoryIds.map((categoryId) => ({
-      courseId: courseData.id!,
-      categoryId,
-    }));
-
-    await db.insert(courseCategories).values(categoryLinks);
-  }
-
-  return {
-    ...course,
-    categoryIds: categoryIds ?? [],
-  };
+  return this.repo.save(course);
 }
 
-  static async delete(id: number): Promise<void> {
-    const deleted = await CourseModel.delete(id);
-    if (!deleted) throw { status: 404, message: "Course not found" };
+
+  async update(id: number, payload: CourseDto) {
+    const course = await this.repo.findOne({ where: { id }, relations: ["categories"] });
+    if (!course) throw new Error("Course not found");
+
+    if (payload.categoryIds) {
+      const categories = await this.categoryRepo.findByIds(payload.categoryIds);
+      course.categories = categories;
+    }
+    const { categoryIds, ...rest } = payload;
+    Object.assign(course, rest);
+    return this.repo.save(course);
+  }
+
+  async delete(id: number) {
+    const course = await this.repo.findOne({ where: { id } });
+    if (!course) throw new Error("Course not found");
+    await this.repo.remove(course);
+    return { message: "Course deleted" };
   }
 }

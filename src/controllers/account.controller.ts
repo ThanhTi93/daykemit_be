@@ -1,49 +1,60 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response } from "express";
 import { AccountService } from "../services/account.service";
 
-export class AccountController {
-  static async getAll(req: Request, res: Response, next: NextFunction) {
+export const AccountController = {
+  getAll: async (req: Request, res: Response) => {
     try {
-      const data = await AccountService.getAll();
-      res.json(data);
-    } catch (err) {
-      next(err);
+      const accounts = await AccountService.findAll();
+      res.json(accounts);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
     }
-  }
+  },
 
-  static async getById(req: Request, res: Response, next: NextFunction) {
+  getOne: async (req: Request, res: Response) => {
     try {
-      const data = await AccountService.getById(Number(req.params.id));
-      res.json(data);
-    } catch (err) {
-      next(err);
+      const account = await AccountService.findOne(Number(req.params.id));
+      res.json(account);
+    } catch (err: any) {
+      res.status(404).json({ message: err.message });
     }
-  }
+  },
 
-  static async create(req: Request, res: Response, next: NextFunction) {
+  create: async (req: Request, res: Response) => {
     try {
-      const data = await AccountService.create(req.body);
-      res.status(201).json(data);
-    } catch (err) {
-      next(err);
+      const account = await AccountService.create(req.body);
+      res.status(201).json(account);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
     }
-  }
+  },
 
-  static async update(req: Request, res: Response, next: NextFunction) {
+  update: async (req: Request, res: Response) => {
     try {
-      const data = await AccountService.update(Number(req.params.id), req.body);
-      res.json(data);
-    } catch (err) {
-      next(err);
+      console.log(req.body);
+      
+      const account = await AccountService.create(req.body);
+      res.json(account);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
     }
-  }
+  },
 
-  static async delete(req: Request, res: Response, next: NextFunction) {
+  softDelete: async (req: Request, res: Response) => {
     try {
-      await AccountService.delete(Number(req.params.id));
-      res.json({ message: "Account deleted" });
-    } catch (err) {
-      next(err);
+      const updated = await AccountService.softDelete(Number(req.params.id));
+      res.json({ message: "Account soft deleted", data: updated });
+    } catch (err: any) {
+      res.status(404).json({ message: err.message });
     }
-  }
-}
+  },
+
+  hardDelete: async (req: Request, res: Response) => {
+    try {
+      await AccountService.hardDelete(Number(req.params.id));
+      res.json({ message: "Account hard deleted" });
+    } catch (err: any) {
+      res.status(404).json({ message: err.message });
+    }
+  },
+};

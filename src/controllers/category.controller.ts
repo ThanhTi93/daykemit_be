@@ -1,40 +1,34 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response } from "express";
 import { CategoryService } from "../services/categories.service";
 
+const service = new CategoryService();
+
 export class CategoryController {
-  static async getAll(req: Request, res: Response, next: NextFunction) {
-    try {
-      const categories = await CategoryService.getAll();
-      res.json(categories);
-    } catch (err) {
-      next(err);
-    }
+  async getAll(req: Request, res: Response) {
+    const data = await service.findAll();
+    return res.json(data);
   }
 
-  static async create(req: Request, res: Response, next: NextFunction) {
-    try {
-      const newCategory = await CategoryService.create(req.body);
-      res.status(201).json(newCategory);
-    } catch (err) {
-      next(err);
-    }
+  async getOne(req: Request, res: Response) {
+    const id = Number(req.params.id);
+    const data = await service.findOne(id);
+    return res.json(data);
   }
 
-  static async update(req: Request, res: Response, next: NextFunction) {
-    try {
-      const updated = await CategoryService.update(Number(req.params.id), req.body);
-      res.json(updated);
-    } catch (err) {
-      next(err);
-    }
+  async create(req: Request, res: Response) {
+    const data = await service.create(req.body);
+    return res.status(201).json(data);
   }
 
-  static async delete(req: Request, res: Response, next: NextFunction) {
-    try {
-      await CategoryService.delete(Number(req.params.id));
-      res.json({ message: "Category deleted" });
-    } catch (err) {
-      next(err);
-    }
+  async update(req: Request, res: Response) {
+    const id = Number(req.params.id);
+    const data = await service.update(id, req.body);
+    return res.json(data);
+  }
+
+  async delete(req: Request, res: Response) {
+    const id = Number(req.params.id);
+    const data = await service.delete(id);
+    return res.json(data);
   }
 }

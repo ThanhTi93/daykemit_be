@@ -1,29 +1,65 @@
-import { AccountModel } from "../models/account.model";
-import { type Account, type NewAccount } from "../config/schema";
+import { AppDataSource } from "../config/data-source";
+import { Account } from "../entities/account.entity";
+import bcrypt from "bcrypt";
 
-export class AccountService {
-  static async getAll(): Promise<Account[]> {
-    return AccountModel.getAll();
-  }
+export const AccountService = {
+  // Lấy tất cả
+  findAll: async () => {
+    return AppDataSource.getRepository(Account).find();
+  },
 
-  static async getById(id: number): Promise<Account> {
-    const data = await AccountModel.getById(id);
-    if (!data) throw { status: 404, message: "Account not found" };
-    return data;
-  }
+  // Lấy 1
+  findOne: async (id: number) => {
+    const account = await AppDataSource.getRepository(Account).findOneBy({ id });
+    if (!account) throw new Error("Account not found");
+    return account;
+  },
 
-  static async create(data: NewAccount): Promise<Account> {
-    return AccountModel.create(data);
-  }
+  // Tạo mới
+  create: async (payload: any) => {
+    const repo = AppDataSource.getRepository(Account);
 
-  static async update(id: number, data: Partial<NewAccount>): Promise<Account> {
-    const updated = await AccountModel.update(id, data);
-    if (!updated) throw { status: 404, message: "Account not found" };
-    return updated;
-  }
+    const hashed = await bcrypt.hash(payload.password, 10);
 
-  static async delete(id: number): Promise<void> {
-    const deleted = await AccountModel.delete(id);
-    if (!deleted) throw { status: 404, message: "Account not found" };
-  }
-}
+    const account = repo.create({
+      ...payload,
+      password: hashed,
+    });
+
+    return repo.save(account);
+  },
+
+  // Cập nhật
+  update: async (id: number, payload: any) => {
+    const repo = AppDataSource.getRepository(Account);
+    const found = await repo.findOneBy({ id });
+    if (!found) throw new Error("Account not found");
+
+    // Nếu có password mới → mã hoá
+    if (payload.password) {
+      payload.password = await bcrypt.hash(payload.password, 10);
+    }
+
+    const updated = repo.merge(found, payload);
+    return repo.save(updated);
+  },
+
+  // Soft delete
+  softDelete: async (id: number) => {
+    const repo = AppDataSource.getRepository(Account);
+    const found = await repo.findOneBy({ id });
+    if (!found) throw new Error("Account not found");
+
+    found.status = false;
+    return repo.save(found);
+  },
+
+  // Hard delete
+  hardDelete: async (id: number) => {
+    const repo = AppDataSource.getRepository(Account);
+    const found = await repo.findOneBy({ id });
+    if (!found) throw new Error("Account not found");
+
+    return repo.remove(found);
+  },
+};
