@@ -4,11 +4,16 @@ import cloudinary from "../config/cloudinary";
 
 const storage = new CloudinaryStorage({
   cloudinary,
-  params: (req, file) => ({
+  params: async (req, file) => ({
     folder: "courses",
     resource_type: "image",
-    allowed_formats: ["jpg", "jpeg", "png", "webp"]
-  })
+    allowed_formats: ["jpg", "jpeg", "png", "webp"],
+  }),
 });
 
-export const upload = multer({ storage });
+export const uploadImageMiddleware = multer({
+  storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+  },
+});

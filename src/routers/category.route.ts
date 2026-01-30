@@ -10,7 +10,7 @@ const controller = new CategoryController();
 router.get("/", controller.getAll.bind(controller));
 router.get("/:id", controller.getOne.bind(controller));
 router.post("/", validateDTO(CategoryDto), controller.create.bind(controller));
-router.patch("/:id", validateDTO(CategoryDto), controller.update.bind(controller));
+router.put("/:id", validateDTO(CategoryDto), controller.update.bind(controller));
 router.delete("/:id", controller.delete.bind(controller));
 
 export default router;

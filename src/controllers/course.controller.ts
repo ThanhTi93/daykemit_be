@@ -4,6 +4,7 @@ import { CourseService } from "../services/course.service";
 const service = new CourseService();
 
 export class CourseController {
+
   async getAll(req: Request, res: Response) {
     const data = await service.findAll();
     res.json(data);
@@ -19,7 +20,8 @@ export class CourseController {
   try {
     const payload = req.body;
     const file = req.file;
-
+   console.log(payload);
+   
     const data = await service.create(payload, file);
 
     res.status(201).json(data);
@@ -27,7 +29,6 @@ export class CourseController {
     res.status(500).json({ message: error.message });
   }
 }
-
 
   async update(req: Request, res: Response) {
     const id = Number(req.params.id);

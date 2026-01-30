@@ -3,6 +3,7 @@ import cors from "cors";
 import categoryRoutes from "./routers/category.route";
 import coursesRoutes from "./routers/course.route";
 import accountRoutes from "./routers/account.route";
+import uploadRoute from "./routers/upload.route";
 import { errorHandler } from "./middlewares/errorHandler";
 import cookieParser from "cookie-parser";
 
@@ -22,7 +23,7 @@ app.use(express.json());
 app.use("/api/categories", categoryRoutes);
 app.use("/api/courses", coursesRoutes );
 app.use("/api/accounts", accountRoutes );
-
+app.use("/api/upload", uploadRoute);
 // Error handler
 app.use(errorHandler);
 

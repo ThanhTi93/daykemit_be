@@ -26,10 +26,7 @@ export class CategoryService {
   }
 
   async create(payload: CategoryDto) {
-    const category = this.repo.create({
-      name: payload.name,
-      description: payload.description
-    });
+    const category = this.repo.create(payload);
 
     return this.repo.save(category);
   }

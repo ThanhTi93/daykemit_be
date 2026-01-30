@@ -22,27 +22,40 @@ export class CourseService {
     return course;
   }
 
-  async create(payload: CourseDto, file?: Express.Multer.File) {
+async create(payload: CourseDto, file?: Express.Multer.File) {
+  // 🔹 Parse categoryIds từ JSON string (FE gửi FormData)
+  let categoryIds: number[] = [];
+  if (payload.categoryIds) {
+    if (typeof payload.categoryIds === "string") {
+      try {
+        categoryIds = JSON.parse(payload.categoryIds);
+      } catch {
+        categoryIds = [];
+      }
+    } else if (Array.isArray(payload.categoryIds)) {
+      categoryIds = payload.categoryIds;
+    }
+  }
+  // 🔹 Lấy danh sách category từ DB
   let categories: Category[] = [];
-  
-  if (payload.categoryIds?.length) {
-    categories = await this.categoryRepo.findByIds(payload.categoryIds);
+  if (categoryIds.length) {
+    categories = await this.categoryRepo.findByIds(categoryIds);
   }
 
-let imgUrl: string | undefined = undefined;
-
-  // Nếu có file thì upload lên Cloudinary
+  // 🔹 Upload file nếu có
+  let imgUrl: string | undefined;
   if (file) {
     const result = await cloudinary.uploader.upload(file.path, {
       folder: "courses",
     });
-    imgUrl = result.secure_url;   // URL thực tế từ Cloudinary
+    imgUrl = result.secure_url;
   }
 
+  // 🔹 Tạo entity
   const course = this.repo.create({
     name: payload.name,
     description: payload.description,
-    imgUrl,     // dùng URL Cloudinary, không phải payload.imgUrl
+    imgUrl,
     status: true,
     categories,
   });
@@ -55,10 +68,10 @@ let imgUrl: string | undefined = undefined;
     const course = await this.repo.findOne({ where: { id }, relations: ["categories"] });
     if (!course) throw new Error("Course not found");
 
-    if (payload.categoryIds) {
-      const categories = await this.categoryRepo.findByIds(payload.categoryIds);
-      course.categories = categories;
-    }
+    // if (payload.categoryIds) {
+    //   const categories = await this.categoryRepo.findByIds(payload.categoryIds);
+    //   course.categories = categories;
+    // }
     const { categoryIds, ...rest } = payload;
     Object.assign(course, rest);
     return this.repo.save(course);

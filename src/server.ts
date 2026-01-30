@@ -2,7 +2,7 @@ import "reflect-metadata"; // cần thiết cho TypeORM
 import app from "./app";
 import { AppDataSource } from "./config/data-source";
 
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 3000;
 
 AppDataSource.initialize()
   .then(() => {
