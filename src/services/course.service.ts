@@ -1,86 +1,156 @@
 import { AppDataSource } from "../config/data-source";
 import { Course } from "../entities/course.entity";
 import { Category } from "../entities/category.entity";
-import { CourseDto } from "../dtos/course.dto";
-import cloudinary from "../config/cloudinary";
+import { CourseImage } from "../entities/course_images.entity";
+import { In } from "typeorm";
+import { UploadService } from "./upload.service";
 
 
 export class CourseService {
-  private repo = AppDataSource.getRepository(Course);
+  private courseRepo = AppDataSource.getRepository(Course);
   private categoryRepo = AppDataSource.getRepository(Category);
+  private imageRepo = AppDataSource.getRepository(CourseImage);
 
   async findAll() {
-    return this.repo.find({ relations: ["categories"], order: { id: "DESC" } });
+    return this.courseRepo.find({ relations: ["categories", "images"], order: { id: "DESC" } });
   }
 
-  async findOne(id: number) {
-    const course = await this.repo.findOne({
+  // ✅ GET BY ID
+  async getCourseById(id: number) {
+    const course = await this.courseRepo.findOne({
       where: { id },
-      relations: ["categories"],
+      relations: ["categories", "images"],
     });
+
     if (!course) throw new Error("Course not found");
+
     return course;
   }
 
-async create(payload: CourseDto, file?: Express.Multer.File) {
-  // 🔹 Parse categoryIds từ JSON string (FE gửi FormData)
-  let categoryIds: number[] = [];
-  if (payload.categoryIds) {
-    if (typeof payload.categoryIds === "string") {
-      try {
-        categoryIds = JSON.parse(payload.categoryIds);
-      } catch {
-        categoryIds = [];
-      }
-    } else if (Array.isArray(payload.categoryIds)) {
-      categoryIds = payload.categoryIds;
-    }
-  }
-  // 🔹 Lấy danh sách category từ DB
-  let categories: Category[] = [];
-  if (categoryIds.length) {
-    categories = await this.categoryRepo.findByIds(categoryIds);
-  }
+  // ✅ CREATE COURSE + IMAGES
+  async createCourse(
+    data: any,
+    files: Express.Multer.File[]
+  ) {
+    const { name, description, categoryIds } = data;
 
-  // 🔹 Upload file nếu có
-  let imgUrl: string | undefined;
-  if (file) {
-    const result = await cloudinary.uploader.upload(file.path, {
-      folder: "courses",
+    // 👉 parse categoryIds
+    const ids = Array.isArray(categoryIds)
+      ? categoryIds.map(Number)
+      : categoryIds?.split(",").map(Number);
+
+    const categories = await this.categoryRepo.find({
+      where: { id: In(ids || []) },
     });
-    imgUrl = result.secure_url;
+
+    // 👉 tạo course
+    const course = this.courseRepo.create({
+      name,
+      description,
+      categories,
+    });
+
+    const savedCourse = await this.courseRepo.save(course);
+
+    // 👉 upload ảnh
+    const uploads = await UploadService.uploadMultiple(files);
+
+    // 👉 lưu ảnh vào DB
+    const images = uploads.map((item) =>
+      this.imageRepo.create({
+        imgUrl: item.url,
+        publicId: item.publicId,
+        course: savedCourse,
+      })
+    );
+
+    await this.imageRepo.save(images);
+
+    return await this.getCourseById(savedCourse.id);
   }
 
-  // 🔹 Tạo entity
-  const course = this.repo.create({
-    name: payload.name,
-    description: payload.description,
-    imgUrl,
-    status: true,
-    categories,
-  });
+  async updateCourse(
+    id: number,
+    data: any,
+    files?: Express.Multer.File[]
+  ) {
+    const course = await this.courseRepo.findOne({
+      where: { id },
+      relations: ["categories", "images"],
+    });
 
-  return this.repo.save(course);
-}
-
-
-  async update(id: number, payload: CourseDto) {
-    const course = await this.repo.findOne({ where: { id }, relations: ["categories"] });
     if (!course) throw new Error("Course not found");
 
-    // if (payload.categoryIds) {
-    //   const categories = await this.categoryRepo.findByIds(payload.categoryIds);
-    //   course.categories = categories;
-    // }
-    const { categoryIds, ...rest } = payload;
-    Object.assign(course, rest);
-    return this.repo.save(course);
+    const { name, description, categoryIds } = data;
+
+    // 👉 update basic info
+    if (name) course.name = name;
+    if (description) course.description = description;
+
+    // 👉 update categories
+    if (categoryIds) {
+      const ids = Array.isArray(categoryIds)
+        ? categoryIds.map(Number)
+        : categoryIds.split(",").map(Number);
+
+      const categories = await this.categoryRepo.find({
+        where: { id: In(ids) },
+      });
+    }
+    const savedCourse = await this.courseRepo.save(course);
+    // 👉 nếu có upload ảnh mới
+    if (files && files.length > 0) {
+      // ❌ xóa ảnh cũ trên cloud (song song + safe)
+      await Promise.all(
+        course.images.map((img) =>
+          UploadService.deleteImage(img.publicId).catch(() => null)
+        )
+      );
+
+      // ❌ xóa DB ảnh cũ
+      await this.imageRepo.remove(course.images);
+      console.log(files);
+
+      // ✅ upload ảnh mới
+      const uploads = await UploadService.uploadMultiple(files);
+      console.log(uploads);
+
+      const newImages = uploads.map((item) =>
+        this.imageRepo.create({
+          imgUrl: item.url,
+          publicId: item.publicId,
+          course: savedCourse,
+        })
+      );
+
+      await this.imageRepo.save(newImages);
+    }
+
+    return await this.getCourseById(id);
   }
 
-  async delete(id: number) {
-    const course = await this.repo.findOne({ where: { id } });
+  async deleteCourse(id: number) {
+    const course = await this.courseRepo.findOne({
+      where: { id },
+      relations: ["images"],
+    });
+
     if (!course) throw new Error("Course not found");
-    await this.repo.remove(course);
-    return { message: "Course deleted" };
+
+    // ❌ xóa ảnh trên cloud (song song)
+    await Promise.all(
+      course.images.map((img) =>
+        UploadService.deleteImage(img.publicId)
+      )
+    );
+
+    // ❌ xóa ảnh trong DB
+    await this.imageRepo.remove(course.images);
+
+    // ❌ xóa course
+    await this.courseRepo.remove(course);
+
+    return { message: "Deleted successfully" };
   }
+
 }

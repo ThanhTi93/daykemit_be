@@ -6,8 +6,10 @@ import {
   JoinTable,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToMany,
 } from "typeorm";
 import { Category } from "./category.entity";
+import { CourseImage } from "./course_images.entity";
 
 @Entity("courses")
 export class Course {
@@ -19,9 +21,6 @@ export class Course {
 
   @Column({ type: "text", nullable: true })
   description?: string;
-
-  @Column({ type: "text", nullable: true })
-  imgUrl?: string;
 
   @CreateDateColumn({
     name: "created_at",
@@ -46,4 +45,8 @@ export class Course {
   })
   @JoinTable() // bảng trung gian tự tạo: course_categories_category
   categories: Category[];
+
+  @OneToMany(() => CourseImage, (image) => image.course)
+ images: CourseImage[];
+ 
 }

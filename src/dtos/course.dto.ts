@@ -10,9 +10,5 @@ export class CourseDto {
 
   @IsOptional()
   @IsString()
-  imgUrl?: string;
-
-  @IsOptional()
-  @IsString()
   categoryIds?: string;
 }
