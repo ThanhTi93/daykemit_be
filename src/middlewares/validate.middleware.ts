@@ -7,7 +7,7 @@ export function validateDTO(dto: any) {
     const instance = plainToInstance(dto, req.body);
 
     const errors = await validate(instance, {
-      skipMissingProperties: true,
+      skipMissingProperties: false,
       whitelist: true,
       forbidNonWhitelisted: true,
     });

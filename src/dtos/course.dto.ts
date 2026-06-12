@@ -11,4 +11,8 @@ export class CourseDto {
   @IsOptional()
   @IsString()
   categoryIds?: string;
+
+   @IsOptional()
+   oldImages?: string | string[];
+  
 }

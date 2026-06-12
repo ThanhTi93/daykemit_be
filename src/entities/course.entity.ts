@@ -43,10 +43,11 @@ export class Course {
   @ManyToMany(() => Category, (category) => category.courses, {
     cascade: true, // tự insert category mới nếu cần
   })
+
   @JoinTable() // bảng trung gian tự tạo: course_categories_category
   categories: Category[];
 
   @OneToMany(() => CourseImage, (image) => image.course)
- images: CourseImage[];
+  images: CourseImage[];
  
 }

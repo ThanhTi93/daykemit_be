@@ -11,13 +11,13 @@ export class Account {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: "varchar", length: 255 })
+  @Column({ type: "varchar", length: 255, unique: true })
   email: string;
 
   @Column({ type: "text" })
   password: string;
 
-  @Column({ type: "varchar", length: 100 })
+  @Column({ type: "varchar", length: 100, unique: true})
   username: string;
 
   @Column({ type: "text", nullable: true })
@@ -26,7 +26,7 @@ export class Account {
   @Column({ type: "varchar", length: 20, nullable: true })
   phone?: string;
 
-  @Column({ type: "varchar", length: 50 })
+  @Column({ type: "varchar", length: 50, default: "user" })
   role: string; // admin | mentor | student
 
   @Column({ type: "boolean", default: true })

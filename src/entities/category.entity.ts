@@ -8,7 +8,7 @@ import {
   OneToMany,
 } from "typeorm";
 import { Course } from "./course.entity";
-import { CourseImage } from "./course_images.entity";
+import { Mentor } from "./mentor.entity";
 
 @Entity("categories")
 export class Category {
@@ -41,9 +41,7 @@ export class Category {
   @ManyToMany(() => Course, (course) => course.categories)
   courses: Course[];
 
-  @OneToMany(() => CourseImage, (image) => image.course, {
-    cascade: true,
-  })
-  images: CourseImage[];
-  
+
+  @ManyToMany(() => Mentor, (mentor) => mentor.categories)
+  mentors: Mentor[];
 }

@@ -69,65 +69,106 @@ export class CourseService {
     return await this.getCourseById(savedCourse.id);
   }
 
-  async updateCourse(
-    id: number,
-    data: any,
-    files?: Express.Multer.File[]
-  ) {
-    const course = await this.courseRepo.findOne({
-      where: { id },
-      relations: ["categories", "images"],
+async updateCourse(
+  id: number,
+  data: any,
+  files?: Express.Multer.File[]
+) {
+  const course = await this.courseRepo.findOne({
+    where: { id },
+    relations: ["categories", "images"],
+  });
+
+  if (!course) {
+    throw new Error("Course not found");
+  }
+
+  const {
+    name,
+    description,
+    categoryIds,
+    oldImages = [],
+  } = data;
+
+  // =========================
+  // UPDATE BASIC INFO
+  // =========================
+
+  if (name) {
+    course.name = name;
+  }
+
+  if (description) {
+    course.description = description;
+  }
+
+  // =========================
+  // UPDATE CATEGORIES
+  // =========================
+
+  if (categoryIds) {
+    const ids = Array.isArray(categoryIds)
+      ? categoryIds.map(Number)
+      : categoryIds.split(",").map(Number);
+
+    const categories = await this.categoryRepo.find({
+      where: {
+        id: In(ids),
+      },
     });
 
-    if (!course) throw new Error("Course not found");
-
-    const { name, description, categoryIds } = data;
-
-    // 👉 update basic info
-    if (name) course.name = name;
-    if (description) course.description = description;
-
-    // 👉 update categories
-    if (categoryIds) {
-      const ids = Array.isArray(categoryIds)
-        ? categoryIds.map(Number)
-        : categoryIds.split(",").map(Number);
-
-      const categories = await this.categoryRepo.find({
-        where: { id: In(ids) },
-      });
-    }
-    const savedCourse = await this.courseRepo.save(course);
-    // 👉 nếu có upload ảnh mới
-    if (files && files.length > 0) {
-      // ❌ xóa ảnh cũ trên cloud (song song + safe)
-      await Promise.all(
-        course.images.map((img) =>
-          UploadService.deleteImage(img.publicId).catch(() => null)
-        )
-      );
-
-      // ❌ xóa DB ảnh cũ
-      await this.imageRepo.remove(course.images);
-      console.log(files);
-
-      // ✅ upload ảnh mới
-      const uploads = await UploadService.uploadMultiple(files);
-      console.log(uploads);
-
-      const newImages = uploads.map((item) =>
-        this.imageRepo.create({
-          imgUrl: item.url,
-          publicId: item.publicId,
-          course: savedCourse,
-        })
-      );
-
-      await this.imageRepo.save(newImages);
-    }
-
-    return await this.getCourseById(id);
+    course.categories = categories;
   }
+
+  // save course
+  await this.courseRepo.save(course);
+
+  // =========================
+  // HANDLE OLD IMAGES
+  // =========================
+
+  // ảnh frontend muốn giữ lại
+  const keepImages = Array.isArray(oldImages)
+    ? oldImages.filter((item) => typeof item === "string")
+    : [oldImages];
+
+  // ảnh bị xóa
+  const removedImages = course.images.filter(
+    (img) => !keepImages.includes(img.imgUrl)
+  );
+
+  // xóa cloudinary
+  await Promise.all(
+    removedImages.map((img) =>
+      UploadService.deleteImage(img.publicId).catch(() => null)
+    )
+  );
+
+  // xóa db
+  if (removedImages.length > 0) {
+    await this.imageRepo.remove(removedImages);
+  }
+
+  // =========================
+  // HANDLE NEW FILES
+  // =========================
+
+  if (files && files.length > 0) {
+    const uploads = await UploadService.uploadMultiple(files);
+
+    const newImages = uploads.map((item) =>
+      this.imageRepo.create({
+        imgUrl: item.url,
+        publicId: item.publicId,
+        course,
+      })
+    );
+
+    await this.imageRepo.save(newImages);
+  }
+
+  return await this.getCourseById(id);
+}
 
   async deleteCourse(id: number) {
     const course = await this.courseRepo.findOne({
